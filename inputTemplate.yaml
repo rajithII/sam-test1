@@ -1,0 +1,347 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation template that contains a Lambda function behind an API Gateway that has three Stages mapped to three Lambda alias'
+Resources:
+   Lambda-function-name:
+      Type: 'AWS::Lambda::Function'
+      Properties:
+         Code:
+            S3Bucket: Bucket-name
+            S3Key: Object-name
+            S3ObjectVersion: Obj-version-id
+         Description: 'Function-description'
+         FunctionName: Lambda-function-name
+         Handler: index.Lambda-function-name
+         Role:
+            'Fn::GetAtt':
+               - LambdaExecutionRole
+               - Arn
+         Runtime: Runtime-env
+   
+   
+   LambdaDevAlias:
+      Type: 'AWS::Lambda::Alias'
+      Properties:
+         FunctionName:
+            Ref: Lambda-function-name
+         FunctionVersion: $LATEST
+         Name: DEV
+   
+   
+   LambdaStageAlias:
+      Type: 'AWS::Lambda::Alias'
+      Properties:
+         FunctionName:
+            Ref: Lambda-function-name
+         FunctionVersion: $LATEST
+         Name: STAGE
+   
+   
+   LambdaProdAlias:
+      Type: 'AWS::Lambda::Alias'
+      Properties:
+         FunctionName:
+            Ref: Lambda-function-name
+         FunctionVersion: $LATEST
+         Name: PROD
+   
+   
+   LambdaExecutionRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+         AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+               -
+                  Effect: Allow
+                  Principal:
+                     Service:
+                        - lambda.amazonaws.com
+                  Action:
+                     - 'sts:AssumeRole'
+         ManagedPolicyArns:
+            - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+   
+   
+   APIName:
+      Type: 'AWS::ApiGateway::RestApi'
+      Properties:
+         Name: 'APIName'
+         Description: 'API-Description'
+         FailOnWarnings: true
+   
+   
+   Lambda-function-nameDevPermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+         Action: 'lambda:invokeFunction'
+         FunctionName:
+            Ref: LambdaDevAlias
+         Principal: apigateway.amazonaws.com
+         SourceArn:
+            'Fn::Join':
+               - ""
+               -
+                  - 'arn:aws:execute-api:'
+                  -
+                     Ref: 'AWS::Region'
+                  - ':'
+                  -
+                     Ref: 'AWS::AccountId'
+                  - ':'
+                  -
+                     Ref: APIName
+                  - '/*'
+   
+   
+   Lambda-function-nameStagePermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+         Action: 'lambda:invokeFunction'
+         FunctionName:
+            Ref: LambdaStageAlias
+         Principal: apigateway.amazonaws.com
+         SourceArn:
+            'Fn::Join':
+               - ""
+               -
+                  - 'arn:aws:execute-api:'
+                  -
+                     Ref: 'AWS::Region'
+                  - ':'
+                  -
+                     Ref: 'AWS::AccountId'
+                  - ':'
+                  -
+                     Ref: APIName
+                  - '/*'
+   
+   
+   Lambda-function-nameProdPermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+         Action: 'lambda:invokeFunction'
+         FunctionName:
+            Ref: LambdaProdAlias
+         Principal: apigateway.amazonaws.com
+         SourceArn:
+            'Fn::Join':
+               - ""
+               -
+                  - 'arn:aws:execute-api:'
+                  -
+                     Ref: 'AWS::Region'
+                  - ':'
+                  -
+                     Ref: 'AWS::AccountId'
+                  - ':'
+                  -
+                     Ref: APIName
+                  - '/*'
+   
+   
+   LambdaPermission:
+      Type: 'AWS::Lambda::Permission'
+      Properties:
+         Action: 'lambda:invokeFunction'
+         FunctionName:
+            'Fn::GetAtt':
+               - Lambda-function-name
+               - Arn
+         Principal: apigateway.amazonaws.com
+         SourceArn:
+            'Fn::Join':
+               - ""
+               -
+                  - 'arn:aws:execute-api:'
+                  -
+                     Ref: 'AWS::Region'
+                  - ':'
+                  -
+                     Ref: 'AWS::AccountId'
+                  - ':'
+                  -
+                     Ref: APIName
+                  - '/*'
+   
+   
+   ApiGatewayCloudWatchLogsRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+         AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+               -
+                  Effect: Allow
+                  Principal:
+                     Service:
+                        - apigateway.amazonaws.com
+                  Action:
+                     - 'sts:AssumeRole'
+         Policies:
+            -
+               PolicyName: ApiGatewayLogsPolicy
+               PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                     -
+                        Effect: Allow
+                        Action:
+                           - 'logs:CreateLogGroup'
+                           - 'logs:CreateLogStream'
+                           - 'logs:DescribeLogGroups'
+                           - 'logs:DescribeLogStreams'
+                           - 'logs:PutLogEvents'
+                           - 'logs:GetLogEvents'
+                           - 'logs:FilterLogEvents'
+                        Resource: '*'
+   
+   
+   ApiGatewayAccount:
+      Type: 'AWS::ApiGateway::Account'
+      Properties:
+         CloudWatchRoleArn:
+            'Fn::GetAtt':
+               - ApiGatewayCloudWatchLogsRole
+               - Arn
+   
+   
+   APINameDevStage:
+      DependsOn:
+         - ApiGatewayAccount
+      Type: 'AWS::ApiGateway::Stage'
+      Properties:
+         DeploymentId:
+            Ref: ApiDeployment
+         MethodSettings:
+            -
+               DataTraceEnabled: true
+               HttpMethod: '*'
+               LoggingLevel: INFO
+               ResourcePath: '/*'
+         RestApiId:
+            Ref: APIName
+         StageName: dev
+         Variables:
+            LambdaAlias: DEV
+   
+   
+   APINameStageStage:
+      DependsOn:
+         - ApiGatewayAccount
+      Type: 'AWS::ApiGateway::Stage'
+      Properties:
+         DeploymentId:
+            Ref: ApiDeployment
+         MethodSettings:
+            -
+               DataTraceEnabled: true
+               HttpMethod: '*'
+               LoggingLevel: INFO
+               ResourcePath: '/*'
+         RestApiId:
+            Ref: APIName
+         StageName: stage
+         Variables:
+            LambdaAlias: STAGE
+   
+   
+   APINameProdStage:
+      DependsOn:
+         - ApiGatewayAccount
+      Type: 'AWS::ApiGateway::Stage'
+      Properties:
+         DeploymentId:
+            Ref: ApiDeployment
+         MethodSettings:
+            -
+               DataTraceEnabled: true
+               HttpMethod: '*'
+               LoggingLevel: INFO
+               ResourcePath: '/*'
+         RestApiId:
+            Ref: APIName
+         StageName: prod
+         Variables:
+            LambdaAlias: PROD
+   
+   
+   ApiDeployment:
+      Type: 'AWS::ApiGateway::Deployment'
+      DependsOn:
+         - APINameRequest
+      Properties:
+         RestApiId:
+            Ref: APIName
+   
+   
+   APINameResource:
+      Type: 'AWS::ApiGateway::Resource'
+      Properties:
+         RestApiId:
+            Ref: APIName
+         ParentId:
+            'Fn::GetAtt':
+               - APIName
+               - RootResourceId
+         PathPart: Path-Part
+   
+   
+   APINameRequest:
+      DependsOn: LambdaPermission
+      Type: 'AWS::ApiGateway::Method'
+      Properties:
+         AuthorizationType: NONE
+         HttpMethod: GET
+         Integration:
+            Type: AWS
+            IntegrationHttpMethod: POST
+            Uri:
+               'Fn::Join':
+                  - ""
+                  -
+                     - 'arn:aws:apigateway:'
+                     -
+                        Ref: 'AWS::Region'
+                     - ':lambda:path/2015-03-31/functions/'
+                     -
+                        'Fn::GetAtt':
+                           - Lambda-function-name
+                           - Arn
+                     - ':${stageVariables.LambdaAlias}'
+                     - /invocations
+            IntegrationResponses:
+               -
+                  StatusCode: 200
+            RequestTemplates:
+               application/json:
+                  'Fn::Join':
+                     - ""
+                     -
+                        - '{'
+                        - '  "name": "$input.params(''name'')"'
+                        - '}'
+         RequestParameters:
+            method.request.querystring.name: false
+         ResourceId:
+            Ref: APINameResource
+         RestApiId:
+            Ref: APIName
+         MethodResponses:
+            -
+               StatusCode: 200
+
+
+Outputs:
+   RootUrl:
+      Description: 'Root URL of the API gateway'
+      Value:
+         'Fn::Join':
+            - ""
+            -
+               - 'https://'
+               -
+                  Ref: APIName
+               - .execute-api.
+               -
+                  Ref: 'AWS::Region'
+               - .amazonaws.com

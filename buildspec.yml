@@ -1,0 +1,13 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - chmod 755 deploy.sh
+      - ./deploy.sh    
+  build:
+    commands:
+artifacts:
+  type: zip
+  files:
+    - inputTemplate.yaml
+    - outputTemplate.yaml
