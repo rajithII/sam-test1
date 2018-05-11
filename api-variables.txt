@@ -1,5 +1,5 @@
 #This file contains all the API variables
 =========================================
-API_Name=NewTimeApiNew
+API_Name=TimeFunction
 API_Description="API used for Time requests"
-Path_Part="newtime"
+Path_Part="time"
