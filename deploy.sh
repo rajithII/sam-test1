@@ -4,7 +4,7 @@
 #Date            :12-04-2018
 #Version         :0.1    
 #Usage		 :This script will retrieve the version id of latest lambda zip file from s3 bucket.
-#====================================================================================================
+#=====================================================================================================
 
 sudo apt-get update -y
 curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash -
